@@ -12,9 +12,20 @@ function filesSelected(e) {
 	dragHover(e)
 	var files = e.target.files || e.dataTransfer.files
 	console.log("uploading these files: ", files)
-	for (var i = 0, f; f = files[i]; i++) {
-		chunkedUpload(f)
+	for (var i = 0, file; file = files[i]; i++) {
+		addToFileList(file, true)
+		chunkedUpload(file)
 	}
+}
+
+function checkUploadSuccess(file) {
+	getFileList(function(files) {
+		if (files.find(f => f.name === file.name && f.size === file.size)) {
+			file.progressBar.className = "done"
+		} else {
+			file.progressBar.className = "failure"
+		}
+	})
 }
 
 // the PHP configuration of upload_max_filesize || post_max_size || memory_limit
@@ -23,7 +34,8 @@ function chunkedUpload(file, chunkSizeBytes = 1000000, startAtBytes = 0) {
 	var xhr = new XMLHttpRequest()
 	if (file.size < startAtBytes) {
 		console.log("done uploading ", file.name, file.size)
-		progressP.className = "success"
+		file.progressBar.value = 1
+		checkUploadSuccess(file)
 		return
 	}
 	
@@ -31,7 +43,6 @@ function chunkedUpload(file, chunkSizeBytes = 1000000, startAtBytes = 0) {
 		if (xhr.readyState == 4) {
 			console.log(xhr.readyState, xhr.status, xhr.responseText)
 			// continue with next chunk
-			
 			setTimeout(function() {
 				chunkedUpload(file, chunkSizeBytes, startAtBytes + chunkSizeBytes)
 			}, 200)
@@ -45,9 +56,8 @@ function chunkedUpload(file, chunkSizeBytes = 1000000, startAtBytes = 0) {
 	if (startAtBytes === 0)
 		xhr.setRequestHeader("X-NEWFILE", "yes")
 	
-	var pc = (1 - startAtBytes / file.size) * 100
-	console.log(pc)
-	progressP.style.backgroundPosition = pc + "% 0"
+	var pc = startAtBytes / file.size
+	file.progressBar.value = pc
 	
 	// File inherits from Blob
 	var chunk = file.slice(startAtBytes, startAtBytes + chunkSizeBytes)
@@ -80,28 +90,34 @@ function getFileList(callback) {
 	xhr.send()
 }
 
-
+var addToFileList = function(file, withProgress = false) {
+	var filesizeKiB = (file.size/1024).toFixed(0)
+	var tr = fileList.appendChild(document.createElement("tr"))
+	tr.innerHTML = "<td><a href='files/"+file.name+"'>"+file.name+"</a></td><td>"+ filesizeKiB +" KiB</td>"
+	// if the progress bar is "string-build" like above, getElementById apparently returns a wrong reference, so we need to manually create it
+	if (withProgress) {
+		var td = tr.appendChild(document.createElement("td"))
+		file.progressBar = td.appendChild(document.createElement("progress"))
+	}
+}
 
 var fileselect = document.getElementById("fileselect")
 var filedrag = document.getElementById("filedrag")
 var fileList = document.getElementById("fileList")
-var print = str => fileList.innerHTML += str
 
 fileselect.addEventListener("change", filesSelected, false)
 filedrag.addEventListener("drop", filesSelected, false)
 
 filedrag.addEventListener("dragover", dragHover, false)
 filedrag.addEventListener("dragleave", dragHover, false)
-filedrag.style.display = "block"
 
 
-var progressElem = document.getElementById("progress")
-var progressP = progressElem.appendChild(document.createElement("p"))
-progressP.appendChild(document.createTextNode("uploading"))
-
+function printFileList(files) {
+	files.forEach(file => {
+		addToFileList(file)
+	})
+}
 
 getFileList(function(files) {
-	files.forEach(file => print("<li><a href='files/"+file.name+"'>"
-		+ file.name + "</a> " + file.size +" Bytes</li>")
-	)
+	printFileList(files)
 })

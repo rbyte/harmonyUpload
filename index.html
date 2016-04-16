@@ -7,22 +7,14 @@
 	<script src="filedrag.js" defer></script>
 </head>
 <body>
-	<h1>HTML5 File Upload with Drag &amp; Drop</h1>
+	<h2>Upload Files</h2>
 	
 	<form id="upload">
-		<fieldset>
-		<legend>HTML File Upload</legend>
-		<div>
-			<label for="fileselect">Files to upload:</label>
-			<input id="fileselect" type="file" multiple />
-			<div id="filedrag">or drop files here</div>
-		</div>
-		</fieldset>
+		<input id="fileselect" type="file" multiple />
+		<div id="filedrag">drag & drop</div>
 	</form>
 	
-	<div id="progress"></div>
+	<table><tbody id="fileList"></tbody></table>
 	
-	<ul id="fileList"></ul>
-
 </body>
 </html>
