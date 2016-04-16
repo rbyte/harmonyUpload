@@ -13,7 +13,7 @@ function filesSelected(e) {
 	var files = e.target.files || e.dataTransfer.files
 	console.log("uploading these files: ", files)
 	for (var i = 0, file; file = files[i]; i++) {
-		addToFileList(file, true)
+		prependToFileList(file, true)
 		chunkedUpload(file)
 	}
 }
@@ -28,8 +28,7 @@ function checkUploadSuccess(file) {
 	})
 }
 
-// the PHP configuration of upload_max_filesize || post_max_size || memory_limit
-// limits the size of the file it can receive in one send
+// the PHP configuration of upload_max_filesize || post_max_size || memory_limit limits the size of the file it can receive in one send
 function chunkedUpload(file, chunkSizeBytes = 1000000, startAtBytes = 0) {
 	var xhr = new XMLHttpRequest()
 	if (file.size < startAtBytes) {
@@ -41,12 +40,15 @@ function chunkedUpload(file, chunkSizeBytes = 1000000, startAtBytes = 0) {
 	
 	xhr.onreadystatechange = function(e) {
 		if (xhr.readyState == 4) {
-			console.log(xhr.readyState, xhr.status, xhr.responseText)
-			// continue with next chunk
-			setTimeout(function() {
+			if (xhr.status !== 200) {
+				file.progressBar.className = "failure"
+				console.log("error:", xhr.readyState, xhr.status, xhr.responseText)
+			} else {
+				// continue with next chunk
+				//setTimeout(function() {
 				chunkedUpload(file, chunkSizeBytes, startAtBytes + chunkSizeBytes)
-			}, 200)
-			
+				//}, 200)
+			}
 		}
 	}
 	
@@ -55,16 +57,12 @@ function chunkedUpload(file, chunkSizeBytes = 1000000, startAtBytes = 0) {
 	xhr.setRequestHeader("Content-Type", "multipart\/form-data")
 	if (startAtBytes === 0)
 		xhr.setRequestHeader("X-NEWFILE", "yes")
-	
-	var pc = startAtBytes / file.size
-	file.progressBar.value = pc
-	
+	// directories can be dropped. do not know how to distingush them from empty files
+	file.progressBar.value = file.size === 0 ? 0 : startAtBytes / file.size
 	// File inherits from Blob
 	var chunk = file.slice(startAtBytes, startAtBytes + chunkSizeBytes)
-	
 	xhr.send(chunk)
 }
-
 
 function getFileList(callback) {
 	var xhr = new XMLHttpRequest()
@@ -74,15 +72,16 @@ function getFileList(callback) {
 			console.assert(xhr.status == 200)
 			// filename;filesize\n...
 			// bla.txt;213\nSecond.jpg;21234\n
-			var files = xhr.responseText.split("\n")
+			var files = xhr.responseText
+				.split("\n")
 				.filter(e => e !== "")
-			files = files.map(e => {
-				var x = e.split(";")
-				console.assert(x.length === 2)
-				var size = Number(x[1])
-				console.assert(!isNaN(size))
-				return {name: x[0], size: size}
-			})
+				.map(e => {
+					var x = e.split(";")
+					console.assert(x.length === 2)
+					var size = Number(x[1])
+					console.assert(!isNaN(size))
+					return {name: x[0], size: size}
+				})
 			callback(files)
 		}
 	}
@@ -90,9 +89,10 @@ function getFileList(callback) {
 	xhr.send()
 }
 
-var addToFileList = function(file, withProgress = false) {
+var prependToFileList = function(file, withProgress = false) {
 	var filesizeKiB = (file.size/1024).toFixed(0)
-	var tr = fileList.appendChild(document.createElement("tr"))
+	// prepend
+	var tr = fileList.insertBefore(document.createElement("tr"), fileList.firstChild)
 	tr.innerHTML = "<td><a href='files/"+file.name+"'>"+file.name+"</a></td><td>"+ filesizeKiB +" KiB</td>"
 	// if the progress bar is "string-build" like above, getElementById apparently returns a wrong reference, so we need to manually create it
 	if (withProgress) {
@@ -113,8 +113,8 @@ filedrag.addEventListener("dragleave", dragHover, false)
 
 
 function printFileList(files) {
-	files.forEach(file => {
-		addToFileList(file)
+	files.reverse().forEach(file => {
+		prependToFileList(file)
 	})
 }
 
