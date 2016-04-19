@@ -1,17 +1,18 @@
 <?php
 
-$filename = (isset($_SERVER['HTTP_X_FILENAME']) ? $_SERVER['HTTP_X_FILENAME'] : false);
+assert(isset($_SERVER['HTTP_X_FILENAME']));
+$filename = $_SERVER['HTTP_X_FILENAME'];
+assert(isset($_SERVER['HTTP_X_CHUNKINDEX']));
+$chunkIndex = $_SERVER['HTTP_X_CHUNKINDEX'];
 
-//assert($filename);
+$dir = "files/";
 
-$flag = (isset($_SERVER['HTTP_X_NEWFILE'])) ? 0 : FILE_APPEND;
-$bytesWritten = file_put_contents("files/".$filename, file('php://input'), $flag);
+//$flag = (isset($_SERVER['HTTP_X_NEWFILE'])) ? 0 : FILE_APPEND;
+
+$bytesWritten = file_put_contents($dir.$filename.".part".$chunkIndex, file('php://input'));
 
 if ($bytesWritten === false) {
 	echo "error writing ".$filename.".";
 } else {
 	echo "wrote ".$bytesWritten." Bytes to ".$filename.".";
 }
-
-
-echo "\nphp script done.";

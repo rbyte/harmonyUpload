@@ -28,26 +28,45 @@ function checkUploadSuccess(file) {
 	})
 }
 
-// the PHP configuration of upload_max_filesize || post_max_size || memory_limit limits the size of the file it can receive in one send
-function chunkedUpload(file, chunkSizeBytes = 1000000, startAtBytes = 0) {
+function combineChunks(file, lastChunkIndex, callback) {
 	var xhr = new XMLHttpRequest()
+	xhr.onreadystatechange = function(e) {
+		if (xhr.readyState == 4) {
+			console.log(xhr.readyState, xhr.status, xhr.responseText)
+			console.assert(xhr.status === 200)
+			callback(file)
+		}
+	}
+	xhr.open("GET", "combineParts.php")
+	xhr.setRequestHeader("X-FILENAME", file.name)
+	xhr.setRequestHeader("X-CHUNKINDEX", lastChunkIndex)
+	xhr.send()
+}
+
+// the PHP configuration of upload_max_filesize || post_max_size || memory_limit limits the size of the file it can receive in one send
+function chunkedUpload(file, chunkSizeBytes = 1000000, chunkIndex = 0) {
+	var startAtBytes = chunkIndex * chunkSizeBytes
 	if (file.size < startAtBytes) {
 		console.log("done uploading ", file.name, file.size)
 		file.progressBar.value = 1
-		checkUploadSuccess(file)
+		combineChunks(file, chunkIndex-1, checkUploadSuccess)
 		return
 	}
 	
+	var xhr = new XMLHttpRequest()
+	var onerror = function(e) {
+		file.progressBar.className = "failure"
+		console.log("error:", xhr.readyState, xhr.status, xhr.responseText)
+	}
+	xhr.addEventListener("error", onerror)
 	xhr.onreadystatechange = function(e) {
 		if (xhr.readyState == 4) {
 			if (xhr.status !== 200) {
-				file.progressBar.className = "failure"
-				console.log("error:", xhr.readyState, xhr.status, xhr.responseText)
+				onerror(e)
 			} else {
+				console.log(xhr.readyState, xhr.status, xhr.responseText, chunkIndex)
 				// continue with next chunk
-				//setTimeout(function() {
-				chunkedUpload(file, chunkSizeBytes, startAtBytes + chunkSizeBytes)
-				//}, 200)
+				chunkedUpload(file, chunkSizeBytes, chunkIndex+1)
 			}
 		}
 	}
@@ -55,8 +74,8 @@ function chunkedUpload(file, chunkSizeBytes = 1000000, startAtBytes = 0) {
 	xhr.open("POST", "upload.php")
 	xhr.setRequestHeader("X-FILENAME", file.name)
 	xhr.setRequestHeader("Content-Type", "multipart\/form-data")
-	if (startAtBytes === 0)
-		xhr.setRequestHeader("X-NEWFILE", "yes")
+	xhr.setRequestHeader("X-CHUNKINDEX", chunkIndex)
+	
 	// directories can be dropped. do not know how to distingush them from empty files
 	file.progressBar.value = file.size === 0 ? 0 : startAtBytes / file.size
 	// File inherits from Blob
