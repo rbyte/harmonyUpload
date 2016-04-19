@@ -7,13 +7,13 @@
 	<script src="main.js" defer></script>
 </head>
 <body>
-	<h2>Upload Files</h2>
-	<form id="upload">
+
+	<div id="upload">
 		<input id="fileselect" type="file" multiple />
-		<div id="filedrag">drag & drop files</div>
-	</form>
-	
-	<table><tbody id="fileList"></tbody></table>
+		<label for="fileselect"><img src="UploadIcon.svg">Upload Files</label>
+		<p>or drag and drop</p>
+		<table id="fileTable"></table>
+	</div>
 	
 </body>
 </html>

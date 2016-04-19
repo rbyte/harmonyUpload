@@ -16,20 +16,28 @@ $dir = "files/";
 // overwrite destination file so we can reliably watch for its creation
 exec('[ -f "'.$dir.$filename.'" ] && rm -f "'.$dir.$filename.'"');
 
-$cmd = "sh combineParts.sh '".$dir.$filename."' '".$lastChunkIndex."'";
-echo $cmd."\n";
-// circumvent size restrictions by relying on an execute watcher
-exec('echo "'.$cmd.'" >> .execute')."\n";
-// does not work because is still subject to restriction
-// echo exec($cmd)."\n";
-
-// wait until watcher is done
-$timeout = 120
-$now = 0
-while ($now++ < $timeout) {
-	if (file_exists($dir.$filename)) {
-		echo "combined!";
-		break;
+if ($lastChunkIndex == "0") {
+	// speed up
+	exec('mv "'.$dir.$filename.'.part0" "'.$dir.$filename.'"');
+	echo "combined (0)!";
+} else {
+	$cmd = "sh combineParts.sh '".$dir.$filename."' '".$lastChunkIndex."'";
+	echo $cmd."\n";
+	// circumvent size restrictions by relying on an execute watcher
+	// one .execute script may contain multiple snippets
+	exec('echo "'.$cmd.'" >> .execute')."\n";
+	// does not work because is still subject to restriction
+	// echo exec($cmd)."\n";
+	
+	// wait until watcher is done
+	$timeout = 120;
+	$now = 0;
+	while ($now++ < $timeout) {
+		if (file_exists($dir.$filename)) {
+			echo "combined!";
+			break;
+		}
+		sleep(1);
 	}
-	sleep(1);
 }
+

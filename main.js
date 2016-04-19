@@ -1,11 +1,17 @@
+/*
+* matthias.graf@mgrf.de
+* GNU GPL v3
+* 2016
+*/
 
-console.assert(window.File && window.FileList && window.FileReader)
+(function() { // not indented
 
 function dragHover(e) {
 	// cancel event and hover styling
 	e.stopPropagation()
 	e.preventDefault()
-	e.target.className = (e.type == "dragover" ? "hover" : "")
+	upload.className = (e.type == "dragover" ? "dragover" : "")
+	//e.target.className = (e.type == "dragover" ? "dragover" : "")
 }
 
 function filesSelected(e) {
@@ -108,10 +114,16 @@ function getFileList(callback) {
 	xhr.send()
 }
 
+function printFileList(files) {
+	files.reverse().forEach(file => {
+		prependToFileList(file)
+	})
+}
+
 var prependToFileList = function(file, withProgress = false) {
 	var filesizeKiB = (file.size/1024).toFixed(0)
 	// prepend
-	var tr = fileList.insertBefore(document.createElement("tr"), fileList.firstChild)
+	var tr = fileTableBody.insertBefore(document.createElement("tr"), fileTableBody.firstChild)
 	tr.innerHTML = "<td><a href='files/"+file.name+"'>"+file.name+"</a></td><td>"+ filesizeKiB +" KiB</td>"
 	// if the progress bar is "string-build" like above, getElementById apparently returns a wrong reference, so we need to manually create it
 	if (withProgress) {
@@ -119,24 +131,30 @@ var prependToFileList = function(file, withProgress = false) {
 		file.progressBar = td.appendChild(document.createElement("progress"))
 	}
 }
+	
+var upload	
+var fileTable
+var fileTableBody
 
-var fileselect = document.getElementById("fileselect")
-var filedrag = document.getElementById("filedrag")
-var fileList = document.getElementById("fileList")
-
-fileselect.addEventListener("change", filesSelected, false)
-filedrag.addEventListener("drop", filesSelected, false)
-
-filedrag.addEventListener("dragover", dragHover, false)
-filedrag.addEventListener("dragleave", dragHover, false)
-
-
-function printFileList(files) {
-	files.reverse().forEach(file => {
-		prependToFileList(file)
+function init() {
+	console.assert(window.File && window.FileList && window.FileReader)
+	
+	upload = document.getElementById("upload")
+	fileTable = document.getElementById("fileTable")
+	fileTableBody = fileTable.appendChild(document.createElement("tbody"))
+	var fileselect = document.getElementById("fileselect")
+	
+	getFileList(function(files) {
+		printFileList(files)
 	})
+	
+	fileselect.addEventListener("change", filesSelected, false)
+	
+	upload.addEventListener("drop", filesSelected, false)
+	upload.addEventListener("dragover", dragHover, false)
+	upload.addEventListener("dragleave", dragHover, false)
 }
 
-getFileList(function(files) {
-	printFileList(files)
-})
+init()
+	
+})()
