@@ -6,29 +6,29 @@
 // however, "bypassing" does not work either: exec(): Unable to fork [php exec.php]), for some unknown reason (perhaps endless recursion?!)
 // the solution employed here is writing the chunks directly onto the disk with php and then using a bash script to combine the chunks together
 
-assert(isset($_SERVER['HTTP_X_FILENAME']));
-$filename = $_SERVER['HTTP_X_FILENAME'];
-assert(isset($_SERVER['HTTP_X_CHUNKINDEX']));
-$lastChunkIndex = $_SERVER['HTTP_X_CHUNKINDEX'];
+function getRequestHeader($name) {
+	assert(isset($_SERVER[$name]));
+	return $_SERVER[$name];
+}
+
+$filename = getRequestHeader('HTTP_X_FILENAME');
+$lastChunkIndex = getRequestHeader('HTTP_X_CHUNKINDEX');
+$fileSize = getRequestHeader('HTTP_X_FILESIZE');
 
 $dir = "files/";
+$cmd = "sh combineParts.sh '".$dir.$filename."' '".$lastChunkIndex."'";
+echo $cmd."\n";
 
-// overwrite destination file so we can reliably watch for its creation
-exec('[ -f "'.$dir.$filename.'" ] && rm -f "'.$dir.$filename.'"');
-
-if ($lastChunkIndex == "0") {
-	// speed up
-	exec('mv "'.$dir.$filename.'.part0" "'.$dir.$filename.'"');
-	echo "combined (0)!";
+if ($fileSize < 64000000) {
+	// subject to size restriction
+	echo exec($cmd)."\n";
 } else {
-	$cmd = "sh combineParts.sh '".$dir.$filename."' '".$lastChunkIndex."'";
-	echo $cmd."\n";
 	// circumvent size restrictions by relying on an execute watcher
-	// one .execute script may contain multiple snippets
-	exec('echo "'.$cmd.'" >> .execute')."\n";
-	// does not work because is still subject to restriction
-	// echo exec($cmd)."\n";
+	// overwrite destination file so we can reliably watch for its creation
+	echo exec('[ -f "'.$dir.$filename.'" ] && rm -f "'.$dir.$filename.'"');
 	
+	// one .execute script may contain multiple snippets
+	echo exec('echo "'.$cmd.'" >> .execute')."\n";
 	// wait until watcher is done
 	$timeout = 120;
 	$now = 0;
@@ -40,4 +40,3 @@ if ($lastChunkIndex == "0") {
 		sleep(1);
 	}
 }
-

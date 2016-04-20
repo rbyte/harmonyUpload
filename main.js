@@ -14,14 +14,25 @@ function dragHover(e) {
 	//e.target.className = (e.type == "dragover" ? "dragover" : "")
 }
 
+var Q = {
+	queue: [],
+	i: 0
+}
+Q.push = (e) => Q.queue.push(e)
+// TODO why does this not work?!
+//Q.push = Q.queue.push
+Q.startNext = () => Q.i < Q.queue.length ? chunkedUpload(Q.queue[Q.i++]) : false
+Q.start = (inParallel = 4) => new Array(inParallel).fill(true).forEach(() => Q.startNext())
+
 function filesSelected(e) {
 	dragHover(e)
 	var files = e.target.files || e.dataTransfer.files
 	console.log("uploading these files: ", files)
 	for (var i = 0, file; file = files[i]; i++) {
 		prependToFileList(file, true)
-		chunkedUpload(file)
+		Q.push(file)
 	}
+	Q.start()
 }
 
 function checkUploadSuccess(file) {
@@ -36,17 +47,30 @@ function checkUploadSuccess(file) {
 
 function combineChunks(file, lastChunkIndex, callback) {
 	var xhr = new XMLHttpRequest()
+	xhr.addEventListener("error", e => onerror(xhr, file))
 	xhr.onreadystatechange = function(e) {
 		if (xhr.readyState == 4) {
-			console.log(xhr.readyState, xhr.status, xhr.responseText)
-			console.assert(xhr.status === 200)
-			callback(file)
+			if (xhr.status !== 200) {
+				onerror(xhr, file)
+			} else {
+				callback(file)
+				Q.startNext()
+			}
 		}
 	}
 	xhr.open("GET", "combineParts.php")
 	xhr.setRequestHeader("X-FILENAME", file.name)
+	xhr.setRequestHeader("X-FILESIZE", file.size)
 	xhr.setRequestHeader("X-CHUNKINDEX", lastChunkIndex)
 	xhr.send()
+}
+	
+var onerror = function(xhr, file) {
+	if (file) {
+		file.progressBar.className = "failure"
+		Q.startNext()
+	}
+	console.log("error:", xhr.readyState, xhr.status, xhr.responseText, xhr.responseURL)
 }
 
 // the PHP configuration of upload_max_filesize || post_max_size || memory_limit limits the size of the file it can receive in one send
@@ -60,15 +84,12 @@ function chunkedUpload(file, chunkSizeBytes = 1000000, chunkIndex = 0) {
 	}
 	
 	var xhr = new XMLHttpRequest()
-	var onerror = function(e) {
-		file.progressBar.className = "failure"
-		console.log("error:", xhr.readyState, xhr.status, xhr.responseText)
-	}
-	xhr.addEventListener("error", onerror)
+	xhr.addEventListener("error", e => onerror(xhr, file))
 	xhr.onreadystatechange = function(e) {
 		if (xhr.readyState == 4) {
 			if (xhr.status !== 200) {
-				onerror(e)
+				onerror(xhr, file)
+				Q.startNext()
 			} else {
 				console.log(xhr.readyState, xhr.status, xhr.responseText, chunkIndex)
 				// continue with next chunk
@@ -92,22 +113,26 @@ function chunkedUpload(file, chunkSizeBytes = 1000000, chunkIndex = 0) {
 function getFileList(callback) {
 	var xhr = new XMLHttpRequest()
 	console.assert(xhr.upload)
+	xhr.addEventListener("error", e => onerror(xhr))
 	xhr.onreadystatechange = function(e) {
 		if (xhr.readyState == 4) {
-			console.assert(xhr.status == 200)
-			// filename;filesize\n...
-			// bla.txt;213\nSecond.jpg;21234\n
-			var files = xhr.responseText
-				.split("\n")
-				.filter(e => e !== "")
-				.map(e => {
-					var x = e.split(";")
-					console.assert(x.length === 2)
-					var size = Number(x[1])
-					console.assert(!isNaN(size))
-					return {name: x[0], size: size}
-				})
-			callback(files)
+			if (xhr.status !== 200) {
+				onerror(xhr)
+			} else {
+				// filename;filesize\n...
+				// bla.txt;213\nSecond.jpg;21234\n
+				var files = xhr.responseText
+					.split("\n")
+					.filter(e => e !== "")
+					.map(e => {
+						var x = e.split(";")
+						console.assert(x.length === 2)
+						var size = Number(x[1])
+						console.assert(!isNaN(size))
+						return {name: x[0], size: size}
+					})
+				callback(files)
+			}
 		}
 	}
 	xhr.open("GET", "listFiles.php")
@@ -131,8 +156,8 @@ var prependToFileList = function(file, withProgress = false) {
 		file.progressBar = td.appendChild(document.createElement("progress"))
 	}
 }
-	
-var upload	
+
+var upload
 var fileTable
 var fileTableBody
 
