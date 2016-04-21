@@ -5,7 +5,23 @@
 */
 
 (function() { // not indented
-
+	
+var config
+var upload
+var fileTable
+var fileTableBody
+var fileselect
+	
+var Q = {
+	queue: [],
+	i: 0
+}
+Q.push = (e) => Q.queue.push(e)
+// does not work, because queue.push uses "this" internally, which is here Q, instead of queue!
+//Q.push = Q.queue.push
+Q.startNext = () => Q.i < Q.queue.length ? chunkedUpload(Q.queue[Q.i++]) : false
+Q.start = () => new Array(config.uploadsToRunInParallel).fill(true).forEach(() => Q.startNext())
+	
 function dragHover(e) {
 	// cancel event and hover styling
 	e.stopPropagation()
@@ -13,16 +29,6 @@ function dragHover(e) {
 	upload.className = (e.type == "dragover" ? "dragover" : "")
 	//e.target.className = (e.type == "dragover" ? "dragover" : "")
 }
-
-var Q = {
-	queue: [],
-	i: 0
-}
-Q.push = (e) => Q.queue.push(e)
-// TODO why does this not work?!
-//Q.push = Q.queue.push
-Q.startNext = () => Q.i < Q.queue.length ? chunkedUpload(Q.queue[Q.i++]) : false
-Q.start = (inParallel = 4) => new Array(inParallel).fill(true).forEach(() => Q.startNext())
 
 function filesSelected(e) {
 	dragHover(e)
@@ -36,35 +42,29 @@ function filesSelected(e) {
 }
 
 function checkUploadSuccess(file) {
-	getFileList(function(files) {
-		if (files.find(f => f.name === file.name && f.size === file.size)) {
-			file.progressBar.className = "done"
-		} else {
-			file.progressBar.className = "failure"
-		}
+	XHR("listFiles.php", function(xhr) {
+		var files = JSON.parse(xhr.responseText)
+		var found = files.find(
+			f => f.name === file.name
+			&& f.size === file.size
+		)
+		file.progressBar.className = found ? "done" : "failure"
 	})
 }
 
 function combineChunks(file, lastChunkIndex, callback) {
-	var xhr = new XMLHttpRequest()
-	xhr.addEventListener("error", e => onerror(xhr, file))
-	xhr.onreadystatechange = function(e) {
-		if (xhr.readyState == 4) {
-			if (xhr.status !== 200) {
-				onerror(xhr, file)
-			} else {
-				callback(file)
-				Q.startNext()
-			}
-		}
+	function fn(xhr) {
+		console.log("combine:", xhr.readyState, xhr.status, xhr.responseText)
+		callback(file)
+		Q.startNext()
 	}
-	xhr.open("GET", "combineParts.php")
-	xhr.setRequestHeader("X-FILENAME", file.name)
-	xhr.setRequestHeader("X-FILESIZE", file.size)
-	xhr.setRequestHeader("X-CHUNKINDEX", lastChunkIndex)
-	xhr.send()
+	XHR("combineParts.php", fn, {
+		"X-FILENAME": file.name,
+		"X-FILESIZE": file.size,
+		"X-CHUNKINDEX": lastChunkIndex
+	})
 }
-	
+
 var onerror = function(xhr, file) {
 	if (file) {
 		file.progressBar.className = "failure"
@@ -85,6 +85,12 @@ function chunkedUpload(file, chunkSizeBytes = 1000000, chunkIndex = 0) {
 	
 	var xhr = new XMLHttpRequest()
 	xhr.addEventListener("error", e => onerror(xhr, file))
+	// fine grained progress
+	xhr.upload.onprogress = function(e) {
+		if (file.size !== 0) {
+			file.progressBar.value = chunkSizeBytes / file.size * e.loaded / e.total + startAtBytes / file.size
+		}
+	}
 	xhr.onreadystatechange = function(e) {
 		if (xhr.readyState == 4) {
 			if (xhr.status !== 200) {
@@ -109,8 +115,8 @@ function chunkedUpload(file, chunkSizeBytes = 1000000, chunkIndex = 0) {
 	var chunk = file.slice(startAtBytes, startAtBytes + chunkSizeBytes)
 	xhr.send(chunk)
 }
-
-function getFileList(callback) {
+	
+function XHR(phpFileToGet, callback, requestHeaders = {}) {
 	var xhr = new XMLHttpRequest()
 	console.assert(xhr.upload)
 	xhr.addEventListener("error", e => onerror(xhr))
@@ -119,25 +125,17 @@ function getFileList(callback) {
 			if (xhr.status !== 200) {
 				onerror(xhr)
 			} else {
-				// filename;filesize\n...
-				// bla.txt;213\nSecond.jpg;21234\n
-				var files = xhr.responseText
-					.split("\n")
-					.filter(e => e !== "")
-					.map(e => {
-						var x = e.split(";")
-						console.assert(x.length === 2)
-						var size = Number(x[1])
-						console.assert(!isNaN(size))
-						return {name: x[0], size: size}
-					})
-				callback(files)
+				callback(xhr)
 			}
 		}
 	}
-	xhr.open("GET", "listFiles.php")
+	xhr.open("GET", phpFileToGet)
+	Object.keys(requestHeaders).forEach(key => {
+		xhr.setRequestHeader(key, requestHeaders[key])
+	})
 	xhr.send()
 }
+	
 
 function printFileList(files) {
 	files.reverse().forEach(file => {
@@ -147,9 +145,10 @@ function printFileList(files) {
 
 var prependToFileList = function(file, withProgress = false) {
 	var filesizeKiB = (file.size/1024).toFixed(0)
+	var willNotBeCombined = file.size > config.maximumCombinableFileSize
 	// prepend
 	var tr = fileTableBody.insertBefore(document.createElement("tr"), fileTableBody.firstChild)
-	tr.innerHTML = "<td><a href='files/"+file.name+"'>"+file.name+"</a></td><td>"+ filesizeKiB +" KiB</td>"
+	tr.innerHTML = "<td><a href='"+config.dir+file.name+"'>"+file.name+(willNotBeCombined ? " (chunked)" : "")+"</a></td><td>"+ filesizeKiB +" KiB</td>"
 	// if the progress bar is "string-build" like above, getElementById apparently returns a wrong reference, so we need to manually create it
 	if (withProgress) {
 		var td = tr.appendChild(document.createElement("td"))
@@ -157,9 +156,6 @@ var prependToFileList = function(file, withProgress = false) {
 	}
 }
 
-var upload
-var fileTable
-var fileTableBody
 
 function init() {
 	console.assert(window.File && window.FileList && window.FileReader)
@@ -167,17 +163,22 @@ function init() {
 	upload = document.getElementById("upload")
 	fileTable = document.getElementById("fileTable")
 	fileTableBody = fileTable.appendChild(document.createElement("tbody"))
-	var fileselect = document.getElementById("fileselect")
-	
-	getFileList(function(files) {
-		printFileList(files)
+	fileselect = document.getElementById("fileselect")
+		
+	XHR("config.php", function(xhr) {
+		config = JSON.parse(xhr.responseText)
+		
+		XHR("listFiles.php", function(xhr) {
+			// [{name: ..., size: ...}, ...]
+			printFileList(JSON.parse(xhr.responseText))
+		})
+		
+		fileselect.addEventListener("change", filesSelected, false)
+		
+		upload.addEventListener("drop", filesSelected, false)
+		upload.addEventListener("dragover", dragHover, false)
+		upload.addEventListener("dragleave", dragHover, false)
 	})
-	
-	fileselect.addEventListener("change", filesSelected, false)
-	
-	upload.addEventListener("drop", filesSelected, false)
-	upload.addEventListener("dragover", dragHover, false)
-	upload.addEventListener("dragleave", dragHover, false)
 }
 
 init()

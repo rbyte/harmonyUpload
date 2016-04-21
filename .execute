@@ -1,0 +1,3 @@
+sh combineParts.sh 'files/AliceDemonstrationVideo.wmv' '76'
+sh combineParts.sh 'files/AliceDemonstrationVideo.wmv' '76'
+sh combineParts.sh 'files/AliceDemonstrationVideo.wmv' '76'

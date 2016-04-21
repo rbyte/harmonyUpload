@@ -1,13 +1,8 @@
 <?php
+include 'config.php';
 
-assert(isset($_SERVER['HTTP_X_FILENAME']));
-$filename = $_SERVER['HTTP_X_FILENAME'];
-assert(isset($_SERVER['HTTP_X_CHUNKINDEX']));
-$chunkIndex = $_SERVER['HTTP_X_CHUNKINDEX'];
-
-$dir = "files/";
-
-//$flag = (isset($_SERVER['HTTP_X_NEWFILE'])) ? 0 : FILE_APPEND;
+$filename = getRequestHeader('HTTP_X_FILENAME');
+$chunkIndex = getRequestHeader('HTTP_X_CHUNKINDEX');
 
 $bytesWritten = file_put_contents($dir.$filename.".part".$chunkIndex, file('php://input'));
 
