@@ -61,6 +61,7 @@ body {
 #fileTable td {
 	/*border: 1px solid grey;*/
 	padding: 2px 10px;
+	color: black;
 }
 #fileTable td:nth-child(2) {
 	color: grey;
@@ -68,6 +69,9 @@ body {
 }
 #fileTable tr:nth-child(even) {
 	background-color: rgba(0, 0, 0, 0.07);
+}
+#fileTable td i {
+	color: darkorchid;
 }
 
 progress.failure {

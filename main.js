@@ -44,18 +44,19 @@ function filesSelected(e) {
 function checkUploadSuccess(file) {
 	XHR("listFiles.php", function(xhr) {
 		var files = JSON.parse(xhr.responseText)
-		var found = files.find(
+		var unique = detectChunkedFiles(files)
+		var found = unique.find(
 			f => f.name === file.name
 			&& f.size === file.size
-		)
+		)// || isNotCombinable(file)
 		file.progressBar.className = found ? "done" : "failure"
 	})
 }
 
-function combineChunks(file, lastChunkIndex, callback) {
+function combineChunks(file, lastChunkIndex) {
 	function fn(xhr) {
 		console.log("combine:", xhr.readyState, xhr.status, xhr.responseText)
-		callback(file)
+		checkUploadSuccess(file)
 		Q.startNext()
 	}
 	XHR("combineParts.php", fn, {
@@ -79,7 +80,7 @@ function chunkedUpload(file, chunkSizeBytes = 1000000, chunkIndex = 0) {
 	if (file.size < startAtBytes) {
 		console.log("done uploading ", file.name, file.size)
 		file.progressBar.value = 1
-		combineChunks(file, chunkIndex-1, checkUploadSuccess)
+		combineChunks(file, chunkIndex-1)
 		return
 	}
 	
@@ -97,7 +98,7 @@ function chunkedUpload(file, chunkSizeBytes = 1000000, chunkIndex = 0) {
 				onerror(xhr, file)
 				Q.startNext()
 			} else {
-				console.log(xhr.readyState, xhr.status, xhr.responseText, chunkIndex)
+				//console.log(xhr.readyState, xhr.status, xhr.responseText, chunkIndex)
 				// continue with next chunk
 				chunkedUpload(file, chunkSizeBytes, chunkIndex+1)
 			}
@@ -135,27 +136,69 @@ function XHR(phpFileToGet, callback, requestHeaders = {}) {
 	})
 	xhr.send()
 }
-	
+
+function detectChunkedFiles(files) {
+	var uniqueFiles = new Set()
+	files.forEach(f => {
+		var isChunk = f.name.match(/^(.*)\.part\d+$/)
+		if (isChunk)
+			f.name = isChunk[1] // base name
+		f.isChunked = isChunk ? true : false
+		uniqueFiles.add(f.name)
+	})
+	console.log(uniqueFiles)
+	uniqueFiles = Array.from(uniqueFiles).map(f => ({
+		name: f,
+		size: 0,
+		isChunked: files.find(e => e.name === f).isChunked
+	}))
+	// sum up size
+	uniqueFiles.forEach(f => f.size = files
+		.filter(e => e.name === f.name)
+		.map(e => e.size)
+		.reduce((a, b) => a+b, 0)
+	)
+	return uniqueFiles
+}
 
 function printFileList(files) {
-	files.reverse().forEach(file => {
+	var uq = detectChunkedFiles(files)
+	uq.forEach(e => console.log(e))
+	uq.reverse().forEach(file => {
 		prependToFileList(file)
 	})
 }
 
+// 12345 => "12 345"
+// 1234567890 => "1 234 567 890"
+function toStringInColumnsOf3(number) {
+	var split = number.toFixed(0).split("")
+	for (var i=split.length-3; i>0; i-=3)
+		split.splice(i, 0, " ")
+	return split.join("")
+}
+
+// maximumCombinableFileSize may be false
+var isNotCombinable = (file) => config.maximumCombinableFileSize && file.size > config.maximumCombinableFileSize
+
 var prependToFileList = function(file, withProgress = false) {
-	var filesizeKiB = (file.size/1024).toFixed(0)
-	var willNotBeCombined = file.size > config.maximumCombinableFileSize
+	if (file.isChunked === undefined)
+		file.isChunked = isNotCombinable(file)
+	
 	// prepend
 	var tr = fileTableBody.insertBefore(document.createElement("tr"), fileTableBody.firstChild)
-	tr.innerHTML = "<td><a href='"+config.dir+file.name+"'>"+file.name+(willNotBeCombined ? " (chunked)" : "")+"</a></td><td>"+ filesizeKiB +" KiB</td>"
+	// template literal
+	tr.innerHTML = `<td>${file.isChunked
+			? `${file.name} <i>chunked</i>`
+			: `<a href='${config.dir}${file.name}'>${file.name}</a>`}
+		</td><td>${toStringInColumnsOf3(file.size/1024)} KiB</td>`;
+	
 	// if the progress bar is "string-build" like above, getElementById apparently returns a wrong reference, so we need to manually create it
 	if (withProgress) {
 		var td = tr.appendChild(document.createElement("td"))
 		file.progressBar = td.appendChild(document.createElement("progress"))
 	}
 }
-
 
 function init() {
 	console.assert(window.File && window.FileList && window.FileReader)

@@ -1,3 +1,2 @@
-sh combineParts.sh 'files/AliceDemonstrationVideo.wmv' '76'
-sh combineParts.sh 'files/AliceDemonstrationVideo.wmv' '76'
-sh combineParts.sh 'files/AliceDemonstrationVideo.wmv' '76'
+php combineParts.php 'AliceDemonstrationVideo.wmv' '76' '76346068'
+php combineParts.php 'Drawing Dynamic Visualizations.mp4' '175' '175150341'
