@@ -30,12 +30,15 @@ if (isset($argv) // is run from command line (privileged manual combine)
     fclose($f) or exit("could not close ".$dir.$filename);
     echo "successfully combined ".$dir.$filename."\n";
 } else {
-	preg_match("/['\"]/", $filename.$lastChunkIndex.$fileSize)
-		or exit("error: input is not safe.");
+	if (preg_match("/['\"]/", $filename.$lastChunkIndex.$fileSize))
+		exit("error: input is not safe.");
+	
+	if (is_file($dir.$filename)) // prepare to overwrite
+		unlink($dir.$filename) or exit("could not delete ".$dir.$filename);
 	
 	$cmd = "php combineParts.php '".$filename."' '".$lastChunkIndex."' '".$fileSize."'";
 	echo $cmd."\n";
 	// script may contain multiple snippets
-	exec('echo "'.$cmd.'" >> .execute');
-	echo "delayed combining. run: sh .execute";
+	exec('echo "'.$cmd.'" >> .pendingCombines.sh');
+	echo "delayed combining. run: sh manualCombine.sh";
 }

@@ -146,7 +146,6 @@ function detectChunkedFiles(files) {
 		f.isChunked = isChunk ? true : false
 		uniqueFiles.add(f.name)
 	})
-	console.log(uniqueFiles)
 	uniqueFiles = Array.from(uniqueFiles).map(f => ({
 		name: f,
 		size: 0,
@@ -162,9 +161,8 @@ function detectChunkedFiles(files) {
 }
 
 function printFileList(files) {
-	var uq = detectChunkedFiles(files)
-	uq.forEach(e => console.log(e))
-	uq.reverse().forEach(file => {
+	var unique = detectChunkedFiles(files)
+	unique.reverse().forEach(file => {
 		prependToFileList(file)
 	})
 }
