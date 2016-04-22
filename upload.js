@@ -75,8 +75,8 @@ var onerror = function(xhr, file) {
 }
 
 // the PHP configuration of upload_max_filesize || post_max_size || memory_limit limits the size of the file it can receive in one send
-function chunkedUpload(file, chunkSizeBytes = 1000000, chunkIndex = 0) {
-	var startAtBytes = chunkIndex * chunkSizeBytes
+function chunkedUpload(file, chunkIndex = 0) {
+	var startAtBytes = chunkIndex * config.chunkSizeBytes
 	if (file.size < startAtBytes) {
 		console.log("done uploading ", file.name, file.size)
 		file.progressBar.value = 1
@@ -89,7 +89,7 @@ function chunkedUpload(file, chunkSizeBytes = 1000000, chunkIndex = 0) {
 	// fine grained progress
 	xhr.upload.onprogress = function(e) {
 		if (file.size !== 0) {
-			file.progressBar.value = chunkSizeBytes / file.size * e.loaded / e.total + startAtBytes / file.size
+			file.progressBar.value = config.chunkSizeBytes / file.size * e.loaded / e.total + startAtBytes / file.size
 		}
 	}
 	xhr.onreadystatechange = function(e) {
@@ -100,7 +100,7 @@ function chunkedUpload(file, chunkSizeBytes = 1000000, chunkIndex = 0) {
 			} else {
 				//console.log(xhr.readyState, xhr.status, xhr.responseText, chunkIndex)
 				// continue with next chunk
-				chunkedUpload(file, chunkSizeBytes, chunkIndex+1)
+				chunkedUpload(file, chunkIndex+1)
 			}
 		}
 	}
@@ -113,7 +113,7 @@ function chunkedUpload(file, chunkSizeBytes = 1000000, chunkIndex = 0) {
 	// directories can be dropped. do not know how to distingush them from empty files
 	file.progressBar.value = file.size === 0 ? 0 : startAtBytes / file.size
 	// File inherits from Blob
-	var chunk = file.slice(startAtBytes, startAtBytes + chunkSizeBytes)
+	var chunk = file.slice(startAtBytes, startAtBytes + config.chunkSizeBytes)
 	xhr.send(chunk)
 }
 	
