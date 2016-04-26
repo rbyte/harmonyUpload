@@ -23,9 +23,11 @@ $maximumCombinableFileSize = 64*1024*1024;
 
 $totalUploadLimit = 10*1024*1024*1024;
 
+// ini_get('upload_max_filesize')
+// ini_get('post_max_size')
+// ini_get('memory_limit')
 $chunkSizeBytes = 10*1024*1024;
 
-// php max_file_uploads = 20 usually
 // ini_get('post_max_size')
 $uploadsToRunInParallel = 6;
 

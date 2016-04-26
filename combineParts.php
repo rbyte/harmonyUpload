@@ -36,7 +36,9 @@ if (isset($argv) // is run from command line (privileged manual combine)
 	if (is_file($dir.$filename)) // prepare to overwrite
 		unlink($dir.$filename) or exit("could not delete ".$dir.$filename);
 	
-	$cmd = "php combineParts.php '".$filename."' '".$lastChunkIndex."' '".$fileSize."'";
+	// may be limited to 2GiB ... bash does not have this restriction
+//	$cmd = "php combineParts.php '".$filename."' '".$lastChunkIndex."' '".$fileSize."'";
+	$cmd = "sh combineParts.sh '".$filename."' '".$lastChunkIndex."' '".$fileSize."'";
 	echo $cmd."\n";
 	// script may contain multiple snippets
 	exec('echo "'.$cmd.'" >> .pendingCombines.sh');
