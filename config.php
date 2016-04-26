@@ -21,10 +21,12 @@ $dir = "files/";
 //$maximumCombinableFileSize = false;
 $maximumCombinableFileSize = 64*1024*1024;
 
-$totalUploadLimit = 20*1024*1024*1024;
+$totalUploadLimit = 10*1024*1024*1024;
 
-$chunkSizeBytes = 1*1024*1024;
+$chunkSizeBytes = 10*1024*1024;
 
+// php max_file_uploads = 20 usually
+// ini_get('post_max_size')
 $uploadsToRunInParallel = 6;
 
 if (!debug_backtrace()) { // is run directly, not included

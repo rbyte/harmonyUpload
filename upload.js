@@ -115,13 +115,11 @@ function chunkedUpload(file, chunkIndex = 0) {
 	}
 	xhr.onreadystatechange = function(e) {
 		if (xhr.readyState == 4) {
-			if (xhr.status !== 200) {
+			if (xhr.status === 200) {
+				chunkedUpload(file, chunkIndex+1)
+			} else {
 				onerror({xhr: xhr, file: file})
 				Q.startNext()
-			} else {
-				//console.log(xhr.readyState, xhr.status, xhr.responseText, chunkIndex)
-				// continue with next chunk
-				chunkedUpload(file, chunkIndex+1)
 			}
 		}
 	}
