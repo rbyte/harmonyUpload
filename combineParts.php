@@ -38,7 +38,7 @@ if (isset($argv) // is run from command line (privileged manual combine)
 	
 	// may be limited to 2GiB ... bash does not have this restriction
 //	$cmd = "php combineParts.php '".$filename."' '".$lastChunkIndex."' '".$fileSize."'";
-	$cmd = "sh combineParts.sh '".$filename."' '".$lastChunkIndex."' '".$fileSize."'";
+	$cmd = "sh combineParts.sh '".$dir.$filename."' '".$lastChunkIndex."' '".$fileSize."'";
 	echo $cmd."\n";
 	// script may contain multiple snippets
 	exec('echo "'.$cmd.'" >> .pendingCombines.sh');
