@@ -18,10 +18,10 @@ $dir = "files/";
 // the solution employed here is just writing the chunks for a manual combine later
 
 // false if not applicable
-$maximumCombinableFileSize = false;
-//$maximumCombinableFileSize = 64*1024*1024;
+//$maximumCombinableFileSize = false;
+$maximumCombinableFileSize = 64*1024*1024;
 
-$totalUploadLimit = 1*1024*1024*1024;
+$totalUploadLimit = 20*1024*1024*1024;
 
 $chunkSizeBytes = 1*1024*1024;
 
@@ -32,6 +32,7 @@ if (!debug_backtrace()) { // is run directly, not included
 		'dir' => $dir,
 		'maximumCombinableFileSize' => $maximumCombinableFileSize,
 		'uploadsToRunInParallel' => $uploadsToRunInParallel,
-		'chunkSizeBytes' => $chunkSizeBytes
+		'chunkSizeBytes' => $chunkSizeBytes,
+		'totalUploadLimit' => $totalUploadLimit
 	));
 }

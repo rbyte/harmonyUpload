@@ -11,6 +11,7 @@ var upload
 var fileTable
 var fileTableBody
 var fileselect
+var files
 	
 var Q = {
 	queue: [],
@@ -32,18 +33,32 @@ function dragHover(e) {
 
 function filesSelected(e) {
 	dragHover(e)
-	var files = e.target.files || e.dataTransfer.files
-	console.log("uploading these files: ", files)
-	for (var i = 0, file; file = files[i]; i++) {
-		prependToFileList(file, true)
-		Q.push(file)
+	var selectedFiles = e.target.files || e.dataTransfer.files
+	var forSelectedFiles = function(mapFn) {
+		for (var i = 0, file; file = selectedFiles[i]; i++)
+			mapFn(file)
 	}
+	
+	var totalSize = 0
+	forSelectedFiles(file => totalSize += file.size)
+	
+	var spaceOccupied = files.map(f => f.size).reduce((a,b) => a+b, 0)
+	var freeSpaceLeft = config.totalUploadLimit - spaceOccupied
+	forSelectedFiles(file => prependToFileList(file, true))
+	if (freeSpaceLeft - totalSize <= 0) {
+		forSelectedFiles(file => onerror({file: file}))
+		onerror({message: "error: combined upload size > free space left: "+toStringInColumnsOf3(freeSpaceLeft < 0 ? 0 : freeSpaceLeft/1024/1024)+" MiB"})
+		return
+	}
+	
+	console.log("uploading these files: ", selectedFiles)
+	forSelectedFiles(file => Q.push(file))
 	Q.start()
 }
 
 function checkUploadSuccess(file) {
 	XHR("listFiles.php", function(xhr) {
-		var files = JSON.parse(xhr.responseText)
+		files = JSON.parse(xhr.responseText)
 		var unique = detectChunkedFiles(files)
 		var found = unique.find(
 			f => f.name === file.name
@@ -66,12 +81,18 @@ function combineChunks(file, lastChunkIndex) {
 	})
 }
 
-var onerror = function(xhr, file) {
+var onerror = function({xhr, file, message}) {
 	if (file) {
 		file.progressBar.className = "failure"
 		Q.startNext()
 	}
-	console.log("error:", xhr.readyState, xhr.status, xhr.responseText, xhr.responseURL)
+	if (xhr) {
+		console.log("error:", xhr.readyState, xhr.status, xhr.responseText, xhr.responseURL)
+		printMessageToPage("error: "+xhr.responseText)
+	}
+	if (message) {
+		printMessageToPage(message)
+	}
 }
 
 // the PHP configuration of upload_max_filesize || post_max_size || memory_limit limits the size of the file it can receive in one send
@@ -85,7 +106,7 @@ function chunkedUpload(file, chunkIndex = 0) {
 	}
 	
 	var xhr = new XMLHttpRequest()
-	xhr.addEventListener("error", e => onerror(xhr, file))
+	xhr.addEventListener("error", e => onerror({xhr: xhr, file: file}))
 	// fine grained progress
 	xhr.upload.onprogress = function(e) {
 		if (file.size !== 0) {
@@ -95,7 +116,7 @@ function chunkedUpload(file, chunkIndex = 0) {
 	xhr.onreadystatechange = function(e) {
 		if (xhr.readyState == 4) {
 			if (xhr.status !== 200) {
-				onerror(xhr, file)
+				onerror({xhr: xhr, file: file})
 				Q.startNext()
 			} else {
 				//console.log(xhr.readyState, xhr.status, xhr.responseText, chunkIndex)
@@ -114,17 +135,21 @@ function chunkedUpload(file, chunkIndex = 0) {
 	file.progressBar.value = file.size === 0 ? 0 : startAtBytes / file.size
 	// File inherits from Blob
 	var chunk = file.slice(startAtBytes, startAtBytes + config.chunkSizeBytes)
-	xhr.send(chunk)
+	//try {
+		xhr.send(chunk)
+	//} catch(e) {
+	//	onerror({xhr: xhr, file: file, message: e})
+	//}
 }
 	
 function XHR(phpFileToGet, callback, requestHeaders = {}) {
 	var xhr = new XMLHttpRequest()
 	console.assert(xhr.upload)
-	xhr.addEventListener("error", e => onerror(xhr))
+	xhr.addEventListener("error", e => onerror({xhr: xhr}))
 	xhr.onreadystatechange = function(e) {
 		if (xhr.readyState == 4) {
 			if (xhr.status !== 200) {
-				onerror(xhr)
+				onerror({xhr: xhr})
 			} else {
 				callback(xhr)
 			}
@@ -179,12 +204,13 @@ function toStringInColumnsOf3(number) {
 // maximumCombinableFileSize may be false
 var isNotCombinable = (file) => config.maximumCombinableFileSize && file.size > config.maximumCombinableFileSize
 
-var prependToFileList = function(file, withProgress = false) {
+var newRowInFileTable = () => fileTableBody.insertBefore(document.createElement("tr"), fileTableBody.firstChild)
+	
+function prependToFileList(file, withProgress = false) {
 	if (file.isChunked === undefined)
 		file.isChunked = isNotCombinable(file)
 	
-	// prepend
-	var tr = fileTableBody.insertBefore(document.createElement("tr"), fileTableBody.firstChild)
+	var tr = newRowInFileTable()
 	// template literal
 	tr.innerHTML = `<td>${file.isChunked
 			? `${file.name} <i>chunked</i>`
@@ -196,6 +222,11 @@ var prependToFileList = function(file, withProgress = false) {
 		var td = tr.appendChild(document.createElement("td"))
 		file.progressBar = td.appendChild(document.createElement("progress"))
 	}
+}
+
+function printMessageToPage(message) {
+	var tr = newRowInFileTable()
+	tr.innerHTML = `<td colspan="3" class="message">${message}</td>`;
 }
 
 function init() {
@@ -212,9 +243,10 @@ function init() {
 		XHR("listFiles.php", function(xhr) {
 			try {
 				// [{name: ..., size: ...}, ...]
-				printFileList(JSON.parse(xhr.responseText))
+				files = JSON.parse(xhr.responseText)
+				printFileList(files)
 			} catch(e) {
-				onerror(xhr)
+				onerror({xhr: xhr})
 			}
 		})
 		

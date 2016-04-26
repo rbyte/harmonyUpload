@@ -7,7 +7,10 @@ $i = getRequestHeader('HTTP_X_CHUNKINDEX');
 
 function hasFreeSpaceLeft() {
 	global $dir, $chunkSizeBytes, $totalUploadLimit;
-	return disk_free_space($dir) > $chunkSizeBytes && totalSpaceUsed() + $chunkSizeBytes < $totalUploadLimit;
+	// disk_free_space(): Value too large for defined data type
+	$result = @disk_free_space($dir);
+	$result = $result ? $result > $chunkSizeBytes : true;
+	return $result && totalSpaceUsed() + $chunkSizeBytes < $totalUploadLimit;
 }
 
 if (!hasFreeSpaceLeft())

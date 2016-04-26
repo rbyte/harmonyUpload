@@ -73,7 +73,10 @@ body {
 #fileTable td i {
 	color: darkorchid;
 }
-
+#fileTable td.message {
+	color: black;
+	background-color: rgb(255, 179, 184);
+}
 progress.failure {
 	background-color: red;
 }
