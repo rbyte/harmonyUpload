@@ -210,8 +210,12 @@ function init() {
 		config = JSON.parse(xhr.responseText)
 		
 		XHR("listFiles.php", function(xhr) {
-			// [{name: ..., size: ...}, ...]
-			printFileList(JSON.parse(xhr.responseText))
+			try {
+				// [{name: ..., size: ...}, ...]
+				printFileList(JSON.parse(xhr.responseText))
+			} catch(e) {
+				onerror(xhr)
+			}
 		})
 		
 		fileselect.addEventListener("change", filesSelected, false)
