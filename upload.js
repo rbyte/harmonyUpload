@@ -57,8 +57,7 @@ function filesSelected(e) {
 }
 
 function checkUploadSuccess(file) {
-	XHR("listFiles.php", function(xhr) {
-		files = JSON.parse(xhr.responseText)
+	updateFiles(function(xhr) {
 		var unique = detectChunkedFiles(files)
 		var found = unique.find(
 			f => f.name === file.name
@@ -232,6 +231,20 @@ function printMessageToPage(message) {
 	tr.innerHTML = `<td colspan="3" class="message">${message}</td>`;
 }
 
+function updateFiles(callback) {
+	XHR("listFiles.php", function(xhr) {
+		try {
+			// [{name: ..., size: ...}, ...]
+			files = JSON.parse(xhr.responseText)
+			// 32bit PHP INT MAX is 2GiB. I therefore return the size as a string
+			files.forEach(f => f.size = Number(f.size))
+		} catch(e) {
+			onerror({xhr})
+		}
+		callback(xhr)
+	})
+}
+
 function init() {
 	console.assert(window.File && window.FileList && window.FileReader)
 	
@@ -243,16 +256,8 @@ function init() {
 	XHR("config.php", function(xhr) {
 		config = JSON.parse(xhr.responseText)
 		
-		XHR("listFiles.php", function(xhr) {
-			try {
-				// [{name: ..., size: ...}, ...]
-				files = JSON.parse(xhr.responseText)
-				// 32bit PHP INT MAX is 2GiB. I therefore return the size as a string
-				files.forEach(f => f.size = Number(f.size))
-				printFileList(files)
-			} catch(e) {
-				onerror({xhr})
-			}
+		updateFiles(function() {
+			printFileList(files)
 		})
 		
 		fileselect.addEventListener("change", filesSelected, false)
