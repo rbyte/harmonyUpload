@@ -246,9 +246,9 @@ function init() {
 		XHR("listFiles.php", function(xhr) {
 			try {
 				// [{name: ..., size: ...}, ...]
-				// 32bit PHP INT MAX is 2GiB. I therefore return the size as a string
 				files = JSON.parse(xhr.responseText)
-					.forEach(f => f.size = Number(f.size))
+				// 32bit PHP INT MAX is 2GiB. I therefore return the size as a string
+				files.forEach(f => f.size = Number(f.size))
 				printFileList(files)
 			} catch(e) {
 				onerror({xhr})

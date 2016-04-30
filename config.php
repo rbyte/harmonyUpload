@@ -18,8 +18,8 @@ $dir = "files/";
 // the solution employed here is just writing the chunks for a manual combine later
 
 // false if not applicable
-$maximumCombinableFileSize = false;
-//$maximumCombinableFileSize = 64*1024*1024;
+//$maximumCombinableFileSize = false;
+$maximumCombinableFileSize = 64*1024*1024;
 
 $totalUploadLimit = 10*1024*1024*1024;
 
