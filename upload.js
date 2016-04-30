@@ -46,7 +46,7 @@ function filesSelected(e) {
 	var freeSpaceLeft = config.totalUploadLimit - spaceOccupied
 	forSelectedFiles(file => prependToFileList(file, true))
 	if (freeSpaceLeft - totalSize <= 0) {
-		forSelectedFiles(file => onerror({file: file}))
+		forSelectedFiles(file => onerror({file}))
 		onerror({message: "error: combined upload size > free space left: "+toStringInColumnsOf3(freeSpaceLeft < 0 ? 0 : freeSpaceLeft/1024/1024)+" MiB"})
 		return
 	}
@@ -64,7 +64,12 @@ function checkUploadSuccess(file) {
 			f => f.name === file.name
 			&& f.size === file.size
 		)// || isNotCombinable(file)
-		file.progressBar.className = found ? "done" : "failure"
+		if (found) {
+			file.progressBar.className = "done"
+			Q.startNext()
+		} else {
+			onerror({xhr, file})
+		}
 	})
 }
 
@@ -72,7 +77,7 @@ function combineChunks(file, lastChunkIndex) {
 	function fn(xhr) {
 		console.log("combine:", xhr.readyState, xhr.status, xhr.responseText)
 		checkUploadSuccess(file)
-		Q.startNext()
+		
 	}
 	XHR("combineParts.php", fn, {
 		"X-FILENAME": file.name,
@@ -106,7 +111,7 @@ function chunkedUpload(file, chunkIndex = 0) {
 	}
 	
 	var xhr = new XMLHttpRequest()
-	xhr.addEventListener("error", e => onerror({xhr: xhr, file: file}))
+	xhr.addEventListener("error", e => onerror({xhr, file}))
 	// fine grained progress
 	xhr.upload.onprogress = function(e) {
 		if (file.size !== 0) {
@@ -116,10 +121,10 @@ function chunkedUpload(file, chunkIndex = 0) {
 	xhr.onreadystatechange = function(e) {
 		if (xhr.readyState == 4) {
 			if (xhr.status === 200) {
+				//console.log(xhr.readyState, xhr.status, xhr.responseText, xhr.responseURL)
 				chunkedUpload(file, chunkIndex+1)
 			} else {
-				onerror({xhr: xhr, file: file})
-				Q.startNext()
+				onerror({xhr, file})
 			}
 		}
 	}
@@ -136,18 +141,18 @@ function chunkedUpload(file, chunkIndex = 0) {
 	//try {
 		xhr.send(chunk)
 	//} catch(e) {
-	//	onerror({xhr: xhr, file: file, message: e})
+	//	onerror({xhr, file, message: e})
 	//}
 }
 	
 function XHR(phpFileToGet, callback, requestHeaders = {}) {
 	var xhr = new XMLHttpRequest()
 	console.assert(xhr.upload)
-	xhr.addEventListener("error", e => onerror({xhr: xhr}))
+	xhr.addEventListener("error", e => onerror({xhr}))
 	xhr.onreadystatechange = function(e) {
 		if (xhr.readyState == 4) {
 			if (xhr.status !== 200) {
-				onerror({xhr: xhr})
+				onerror({xhr})
 			} else {
 				callback(xhr)
 			}
@@ -193,10 +198,10 @@ function printFileList(files) {
 // 12345 => "12 345"
 // 1234567890 => "1 234 567 890"
 function toStringInColumnsOf3(number) {
-	var split = number.toFixed(0).split("")
-	for (var i=split.length-3; i>0; i-=3)
-		split.splice(i, 0, " ")
-	return split.join("")
+	var chars = [...number.toFixed(0)]
+	for (var i=chars.length-3; i>0; i-=3)
+		chars.splice(i, 0, " ")
+	return chars.join("")
 }
 
 // maximumCombinableFileSize may be false
@@ -241,10 +246,12 @@ function init() {
 		XHR("listFiles.php", function(xhr) {
 			try {
 				// [{name: ..., size: ...}, ...]
+				// 32bit PHP INT MAX is 2GiB. I therefore return the size as a string
 				files = JSON.parse(xhr.responseText)
+					.forEach(f => f.size = Number(f.size))
 				printFileList(files)
 			} catch(e) {
-				onerror({xhr: xhr})
+				onerror({xhr})
 			}
 		})
 		
